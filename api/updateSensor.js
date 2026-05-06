@@ -31,6 +31,7 @@ export default async function handler(req, res) {
   }
 
   try {
+    // 1. UPDATE THE LIVE PARKING SLOT
     await db
       .collection("parking_slots")
       .doc(slotId)
@@ -45,7 +46,24 @@ export default async function handler(req, res) {
         { merge: true },
       );
 
-    return res.status(200).send(`Slot ${slotId} updated to ${status}`);
+    // 2. NEW: ADD TO PARKING HISTORY (This is what the chart needs!)
+    // We log it whenever a car parks (status 1)
+    if (status === 1 || status === 2 || status === 3) {
+      await db.collection("parking_history").add({
+        slotId: slotId,
+        event:
+          status === 1
+            ? "OCCUPIED"
+            : status === 2
+              ? "RESERVED"
+              : "UNAUTHORIZED",
+        timestamp: FieldValue.serverTimestamp(),
+      });
+    }
+
+    return res
+      .status(200)
+      .send(`Slot ${slotId} updated to ${status} and logged in history.`);
   } catch (error) {
     console.error("Database Error:", error);
     return res.status(500).send("Internal Server Error");
